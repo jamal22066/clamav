@@ -1,0 +1,79 @@
+
+
+    - name: Uninstall clamav and clamd packages
+      become: true
+      yum:
+        name: "{{ packages }}"
+        state: absent
+      vars:
+        packages:
+        - clamd
+        - clamav
+        - clamav-filesystem
+        - clamav-update
+        - clamav-lib
+
+    - name: Copy clamav rpm to server
+      become: true
+      copy:
+        src: "{{ item.src }}"
+        dest: /tmp
+      with_items:
+              - { src: 'clamav-0.101.1-1.el7.x86_64.rpm' }
+              - { src: 'clamav-filesystem-0.101.1-1.el7.noarch.rpm' }
+              - { src: 'clamav-update-0.101.1-1.el7.x86_64.rpm' }
+              - { src: 'clamav-lib-0.101.1-1.el7.x86_64.rpm' }
+
+    - name: Access tmp folder and install clamav packages
+      become: true
+      yum:
+        name: '/tmp/{{ item }}'
+        state: present
+        disable_gpg_check: yes
+      with_items:
+         - clamav-0.101.1-1.el7.x86_64.rpm
+         - clamav-filesystem-0.101.1-1.el7.noarch.rpm
+         - clamav-update-0.101.1-1.el7.x86_64.rpm
+         - clamav-lib-0.101.1-1.el7.x86_64.rpm
+
+    - name: Copy freshclam config file
+      become: true
+      copy:
+        src: freshclam.conf.js
+        dest: /etc/freshclam.conf
+
+    - name: Add freshclam definition update to cron
+      become: true
+      cron:
+        name: FreshClam
+        minute: "0"
+        hour: "1,13"
+        job: "/usr/bin/freshclam > /dev/null"
+
+    - name: Build freshclam database from freshclam.conf
+      become: true
+      command: '/bin/freshclam'
+
+    - name: Add clamav scan to cron
+      become: true
+      cron:
+        name: Clamscan
+        minute: "15"
+        hour: "1"
+        job: find / -ctime -1 -type f -not -path "/proc/*" -not -path "/sys/*" -print0 | xargs -0 clamscan --infected >/var/log/clamscan.log
+
+    - name: Restart crond
+      systemd:
+        state: restarted
+        name: crond
+
+    - name: "Remove rpm files from tmp directory"
+      become: true
+      file:
+        path: '/tmp/{{ item }}'
+        state: absent
+      with_items:
+        - clamav-0.101.1-1.el7.x86_64.rpm
+        - clamav-filesystem-0.101.1-1.el7.noarch.rpm
+        - clamav-lib-0.101.1-1.el7.x86_64.rpm
+        - clamav-update-0.101.1-1.el7.x86_64.rpm
