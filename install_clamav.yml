@@ -1,5 +1,5 @@
 - hosts:
-  - "{{ target }}"
+  - all
   gather_facts: false
   pre_tasks:
   - name: Waiting for SSH to be available
