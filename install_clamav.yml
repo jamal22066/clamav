@@ -1,0 +1,15 @@
+- hosts:
+  - "{{ target }}"
+  gather_facts: false
+  pre_tasks:
+  - name: Waiting for SSH to be available
+    wait_for_connection:
+      delay: 2
+      timeout: 300
+  - setup: # aka gather_facts
+  become: true
+  roles:
+  - role: clamav-install
+    when:
+    - ansible_os_family == 'RedHat'
+    - ansible_distribution_major_version is version('7', '=')

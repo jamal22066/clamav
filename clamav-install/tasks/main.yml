@@ -1,18 +1,23 @@
-
-
+    - name: Stop clamav
+      become: true
+      systemd:
+        name: clamd@scan
+        state: stopped
+      ignore_errors: true  
+    
     - name: Uninstall clamav and clamd packages
       become: true
       yum:
         name: "{{ packages }}"
         state: absent
       vars:
-        packages:
+        packages:      
         - clamd
         - clamav
         - clamav-filesystem
         - clamav-update
-        - clamav-lib
-
+        - clamav-lib     
+    
     - name: Copy clamav rpm to server
       become: true
       copy:
@@ -22,8 +27,8 @@
               - { src: 'clamav-0.101.1-1.el7.x86_64.rpm' }
               - { src: 'clamav-filesystem-0.101.1-1.el7.noarch.rpm' }
               - { src: 'clamav-update-0.101.1-1.el7.x86_64.rpm' }
-              - { src: 'clamav-lib-0.101.1-1.el7.x86_64.rpm' }
-
+              - { src: 'clamav-lib-0.101.1-1.el7.x86_64.rpm' } 
+    
     - name: Access tmp folder and install clamav packages
       become: true
       yum:
@@ -34,7 +39,7 @@
          - clamav-0.101.1-1.el7.x86_64.rpm
          - clamav-filesystem-0.101.1-1.el7.noarch.rpm
          - clamav-update-0.101.1-1.el7.x86_64.rpm
-         - clamav-lib-0.101.1-1.el7.x86_64.rpm
+         - clamav-lib-0.101.1-1.el7.x86_64.rpm       
 
     - name: Copy freshclam config file
       become: true
@@ -54,13 +59,19 @@
       become: true
       command: '/bin/freshclam'
 
+    - name: Create quarantine folder
+      file:
+        path: /var/lib/clamav/quarantine
+        state: directory
+        mode: 0755      
+
     - name: Add clamav scan to cron
       become: true
       cron:
         name: Clamscan
         minute: "15"
         hour: "1"
-        job: find / -ctime -1 -type f -not -path "/proc/*" -not -path "/sys/*" -print0 | xargs -0 clamscan --infected >/var/log/clamscan.log
+        job: find / -ctime -1 -type f -not -path "/proc/*" -not -path "/sys/*" -not -path "/var/lib/clamav/quarantine/*" -print0 | xargs -0 clamscan --infected --move=/var/lib/clamav/quarantine >/var/log/clamscan.log
 
     - name: Restart crond
       systemd:
@@ -76,4 +87,4 @@
         - clamav-0.101.1-1.el7.x86_64.rpm
         - clamav-filesystem-0.101.1-1.el7.noarch.rpm
         - clamav-lib-0.101.1-1.el7.x86_64.rpm
-        - clamav-update-0.101.1-1.el7.x86_64.rpm
+        - clamav-update-0.101.1-1.el7.x86_64.rpm      
